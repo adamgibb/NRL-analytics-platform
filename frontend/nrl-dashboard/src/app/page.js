@@ -17,44 +17,34 @@ export default function Home() {
     const [bestSeasons, setBestSeasons] = useState([]);
     const [biggestScore, setBiggestScore] = useState([]);
     const [stadiumInfos, setStadiumInfos] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
-        fetch('http://localhost:3000/get_best_win_overall')
-            .then(response => response.json())
-            .then(bestWinOverall => setBestWinOverall(bestWinOverall));
-        fetch('http://localhost:3000/get_worst_win_overall')
-            .then(response => response.json())
-            .then(worstWinOverall => setWorstWinOverall(worstWinOverall));
-        fetch('http://localhost:3000/get_team_trends')
-            .then(response => response.json())
-            .then(data => setData(data));
-        fetch('http://localhost:3000/get_best_surface_win')
-            .then(response => response.text())
-            .then(bestSurfaceWin => setBestSurfaceWin(JSON.parse(bestSurfaceWin)));
-        fetch('http://localhost:3000/get_worst_surface_win')
-            .then(response => response.text())
-            .then(worstSurfaceWin => setWorstSurfaceWin(JSON.parse(worstSurfaceWin)));
-        fetch('http://localhost:3000/get_best_home_win')
-            .then(response => response.text())
-            .then(bestHomeWin => setBestHomeWin(JSON.parse(bestHomeWin)));
-        fetch('http://localhost:3000/get_worst_home_win')
-            .then(response => response.text())
-            .then(worstHomeWin => setWorstHomeWin(JSON.parse(worstHomeWin)));
-        fetch('http://localhost:3000/get_best_away_win')
-            .then(response => response.text())
-            .then(bestAwayWin => setBestAwayWin(JSON.parse(bestAwayWin)));
-        fetch('http://localhost:3000/get_worst_away_win')
-            .then(response => response.text())
-            .then(worstAwayWin => setWorstAwayWin(JSON.parse(worstAwayWin)));
-        fetch('http://localhost:3000/get_points_for_against')
-            .then(response => response.text())
-            .then(pointsForAgainst => setPointsForAgainst(JSON.parse(pointsForAgainst)));
-        fetch('http://localhost:3000/get_best_season')
-            .then(response => response.text())
-            .then(bestSeason => setBestSeasons(JSON.parse(bestSeason)));
-        fetch('http://localhost:3000/get_biggest_score')
-            .then(response => response.text())
-            .then(biggestScore => setBiggestScore(JSON.parse(biggestScore)));
+        const controller = new AbortController();
+        const endpoints = [
+            ['get_best_win_overall', setBestWinOverall],
+            ['get_worst_win_overall', setWorstWinOverall],
+            ['get_team_trends', setData],
+            ['get_best_surface_win', setBestSurfaceWin],
+            ['get_worst_surface_win', setWorstSurfaceWin],
+            ['get_best_home_win', setBestHomeWin],
+            ['get_worst_home_win', setWorstHomeWin],
+            ['get_best_away_win', setBestAwayWin],
+            ['get_worst_away_win', setWorstAwayWin],
+            ['get_points_for_against', setPointsForAgainst],
+            ['get_best_season', setBestSeasons],
+            ['get_biggest_score', setBiggestScore],
+            ['get_team_stadiums', setStadiumInfos],
+        ];
+        Promise.all(endpoints.map(async ([path, setValue]) => {
+            const response = await fetch(`/api/${path}`, { signal: controller.signal });
+            if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
+            setValue(await response.json());
+        })).catch((cause) => {
+            if (cause.name !== 'AbortError') setError(cause.message);
+        }).finally(() => setLoading(false));
+        return () => controller.abort();
     }, []);
 
     const handleTeamClick = (team) => {
@@ -65,31 +55,12 @@ export default function Home() {
         setSelectedTeam(null);
     };
 
-    useEffect(() => {
-        // Fetch stadium information for all teams
-        const fetchStadiumInfos = async () => {
-            const teams = Array.from(new Set(data.map(item => item.team))); 
-            const stadiumInfos = await Promise.all(teams.map(async (team) => {
-                const response = await puter.ai.chat(`What is the stadium capacity of the NRL team ${team}, give me a json response with the following structure: {"Stadium": stadium, "Location": location, "Capacity": capacity}?`);
-                try {
-                    const response = await puter.ai.chat(`What is the stadium capacity of the NRL team ${team}, give me a json response with the following structure where all values are strings: {"Stadium": stadium, "Location": location, "Capacity": capacity}? Do not give me warnings`);
-                    const cleanedResponse = response.message.content.replace(/^```json|```$/gm, '').trim();
-                    const parsedResponse = JSON.parse(cleanedResponse);
-                    return { team, ...parsedResponse };
-                } catch (error) {
-                    console.error(`Failed to parse response for team ${team}:`, error);
-                    return { team, Stadium: "Unknown", Location: "Unknown", Capacity: "Unknown" };
-                }
-            }));
-            setStadiumInfos(stadiumInfos);
-        };
-
-        fetchStadiumInfos();
-
-    }, [data]);
-
     // Get unique teams
     const uniqueTeams = Array.from(new Set(data.map(item => item.team)));
+
+    if (loading) return <main className="p-8" role="status">Loading NRL statistics…</main>;
+    if (error) return <main className="p-8" role="alert">Unable to load statistics: {error}</main>;
+    if (data.length === 0) return <main className="p-8">No match data is available yet.</main>;
 
     if (selectedTeam) {
         const teamData = data.filter(item => item.team === selectedTeam);
@@ -97,23 +68,8 @@ export default function Home() {
         const stadiumInfo = stadiumInfos.find(info => info.team === selectedTeam);
         const bestSeason = bestSeasons.filter(season => season.team === selectedTeam);
         const biggestScoreTeam = biggestScore.filter(score => score.team === selectedTeam);
-        const biggestWinScoreTeam = biggestScoreTeam.reduce((acc, curr) => {
-            if (acc.best_score_for_team > curr.best_score_for_team) {
-                return acc;
-            } else {
-                return curr;
-            }
-        }
-        , {});
-
-        const biggestLossScoreTeam = biggestScoreTeam.reduce((acc, curr) => {
-            if (acc.best_score_for_team < curr.best_score_for_team) {
-                return acc;
-            } else {
-                return curr;
-            }
-        }
-        , {});
+        const biggestWinScoreTeam = biggestScoreTeam.find(score => score.result_type === 'win');
+        const biggestLossScoreTeam = biggestScoreTeam.find(score => score.result_type === 'loss');
 
         return (
             <div className="min-h-screen p-4">
@@ -145,20 +101,21 @@ export default function Home() {
                 {stadiumInfo ? (
                     <div className="flex justify-center">
                         <div className="bg-white p-4 rounded-lg shadow-md mx-2 mb-4 w-full max-w-md">
-                            <p className="text-lg font-semibold text-blue-800">Stadium Name: {stadiumInfo.Stadium}</p>
-                            <p className="text-gray-600">Capacity: {stadiumInfo.Capacity}</p>
-                            <p className="text-gray-600">Location: {stadiumInfo.Location}</p>
+                            <p className="text-lg font-semibold text-blue-800">Stadium Name: {stadiumInfo.Stadium ?? 'Not recorded'}</p>
+                            <p className="text-gray-600">Capacity: {stadiumInfo.Capacity ?? 'Not recorded'}</p>
+                            <p className="text-gray-600">Location: {stadiumInfo.Location ?? 'Not recorded'}</p>
                         </div>
                     </div>
                 ) : (
                     <div className="flex justify-center">
                         <div className="bg-white p-4 rounded-lg shadow-md mx-2 mb-4 w-full max-w-md">
-                            <p className="text-lg font-semibold text-blue-800">Fetching Stadium Information...</p>
+                            <p className="text-lg font-semibold text-blue-800">Stadium information not recorded.</p>
                         </div>
                     </div>
                 )}
-                {bestSeason.length > 0 && biggestScoreTeam && (
+                {(bestSeason.length > 0 || biggestWinScoreTeam || biggestLossScoreTeam) && (
                     <div className="flex justify-center space-x-4 items-start">
+                        {bestSeason.length > 0 && (
                         <div className="bg-white p-4 rounded-lg shadow-md mx-2 mb-4 w-full max-w-md">
                             <h2 className="text-2xl font-bold text-center mb-4 text-green-600">Most Wins in a Season</h2>
                             {bestSeason.map((season, index) => (
@@ -168,10 +125,12 @@ export default function Home() {
                                 </div>
                             ))}
                         </div>
+                        )}
+                        {(biggestWinScoreTeam || biggestLossScoreTeam) && (
                         <div className="bg-white p-4 rounded-lg shadow-md mx-2 mb-4 w-full max-w-lg">
                             <h2 className="text-2xl font-bold text-center mb-4 text-green-600">Biggest Score</h2>
                             <div className="flex flex-col">
-                                <div className="mb-4">
+                                {biggestWinScoreTeam && <div className="mb-4">
                                     <p className="text-lg font-semibold text-green-800">Biggest Win Margin:</p>
                                     <p className="text-gray-600">Score difference: {biggestWinScoreTeam.best_score_difference}</p>
                                     <p className="text-gray-600 flex items-center">
@@ -184,9 +143,9 @@ export default function Home() {
                                     <img src={`${biggestWinScoreTeam.opponent}.png`} alt={`${biggestWinScoreTeam.opponent} icon`} className="h-12 w-12 mb-2" />
                                     <p className="text-gray-600">Year: {biggestWinScoreTeam.year}</p>
                                     <p className="text-gray-600">Round: {biggestWinScoreTeam.round}</p>
-                                </div>
+                                </div>}
 
-                                <div className="mb-4">
+                                {biggestLossScoreTeam && <div className="mb-4">
                                     <p className="text-lg font-semibold text-green-800">Biggest Loss Margin:</p>
                                     <p className="text-gray-600">Score difference: {biggestLossScoreTeam.best_score_difference}</p>
                                     <p className="text-gray-600 flex items-center">
@@ -199,9 +158,10 @@ export default function Home() {
                                     <img src={`${biggestLossScoreTeam.opponent}.png`} alt={`${biggestLossScoreTeam.opponent} icon`} className="h-12 w-12 mb-2" />
                                     <p className="text-gray-600">Year: {biggestLossScoreTeam.year}</p>
                                     <p className="text-gray-600">Round: {biggestLossScoreTeam.round}</p>
-                                </div>
+                                </div>}
                             </div>
                         </div>
+                        )}
                     </div>
                 )}  
             </div>
@@ -211,7 +171,8 @@ export default function Home() {
     return (
       <div className="min-h-screen p-4 flex flex-col justify-between items-center mx-auto">
       <h1 className="text-5xl font-extrabold text-center mb-4 text-blue-700">NRL Team Performance Trends</h1>
-      <h2 className="text-3xl font-bold text-center mb-4 text-blue-600">2017-2021</h2>
+      <p className="text-center text-sm text-gray-700 mb-2">The included sample scores and attendance are illustrative, not historical NRL results.</p>
+      <h2 className="text-3xl font-bold text-center mb-4 text-blue-600">Match history</h2>
       <div className="slider-thumb"></div>
       <div className="grid grid-cols-2 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-4 gap-4">
                 {bestWinOverall.length > 0 && pointsForAgainst.length > 0 && (
@@ -226,11 +187,11 @@ export default function Home() {
                                 <div className="text-right">
                                     <p className="text-gray-600 flex items-center">
                                         <i className="fas fa-arrow-up text-green-500 mr-2"></i>
-                                        Points For: {pointsForAgainst[0].total_points_scored}pts
+                                        Points For: {pointsForAgainst.find(row => row.team === item.team)?.total_points_scored ?? '—'}pts
                                     </p>
                                     <p className="text-gray-600 flex items-center">
                                         <i className="fas fa-arrow-down text-red-500 mr-2"></i>
-                                        Points Against: {pointsForAgainst[0].total_points_conceded}pts
+                                        Points Against: {pointsForAgainst.find(row => row.team === item.team)?.total_points_conceded ?? '—'}pts
                                     </p>
                                 </div>
                             </div>
@@ -249,11 +210,11 @@ export default function Home() {
                                 <div className="text-right">
                                     <p className="text-gray-600 flex items-center">
                                         <i className="fas fa-arrow-up text-green-500 mr-2"></i>
-                                        Points For: {pointsForAgainst[1].total_points_scored}pts
+                                        Points For: {pointsForAgainst.find(row => row.team === item.team)?.total_points_scored ?? '—'}pts
                                     </p>
                                     <p className="text-gray-600 flex items-center">
                                         <i className="fas fa-arrow-down text-red-500 mr-2"></i>
-                                        Points Against: {pointsForAgainst[1].total_points_conceded}pts
+                                        Points Against: {pointsForAgainst.find(row => row.team === item.team)?.total_points_conceded ?? '—'}pts
                                     </p>
                                 </div>
                             </div>

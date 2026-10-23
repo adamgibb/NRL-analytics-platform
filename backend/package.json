@@ -1,9 +1,11 @@
 {
   "name": "sports-data-api",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node app.js",
+    "db:setup": "node scripts/setup-db.js",
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",

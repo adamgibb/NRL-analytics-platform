@@ -1,136 +1,35 @@
 # NRL Analytics Platform
 
-This project is an analytics platform for NRL (National Rugby League) data. It consists of a backend API built with Express.js and a frontend dashboard built with Next.js and React.
+An Express API and Next.js dashboard for NRL match statistics. The included database fixture is **illustrative**, with invented scores and attendance. Replace it with licensed, verified match data before presenting results as historical NRL facts.
 
-## Table of Contents
+## Requirements
 
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Backend Setup](#backend-setup)
-  - [Frontend Setup](#frontend-setup)
-- [Scripts](#scripts)
-  - [Backend](#backend)
-  - [Frontend](#frontend)
-- [Usage](#usage)
-- [Learn More](#learn-more)
-- [License](#license)
+- Node.js 20 or newer and npm
+- MySQL 8.0 or newer
 
-## Project Structure
+## Run locally
 
-```
-NRL-analytics-platform/
-├── .env
-├── .gitignore
-├── backend/
-│   ├── app.js
-│   ├── package.json
-├── config/
-├── frontend/
-│   ├── nrl-dashboard/
-│   │   ├── .gitignore
-│   │   ├── .next/
-│   │   ├── jsconfig.json
-│   │   ├── next.config.mjs
-│   │   ├── package.json
-│   │   ├── postcss.config.mjs
-│   │   ├── public/
-│   │   ├── src/
-│   │   ├── tailwind.config.mjs
-├── frontend-old/
-│   ├── dashboard.html
-├── LICENSE
-├── README.md
-```
+1. In `backend`, run `npm ci`.
+2. Copy `backend/.env.example` to `backend/.env` and set your MySQL username and password. The account needs permission to create the configured database for first setup.
+3. Run `npm run db:setup` in `backend`. This creates the schema and loads an idempotent demo fixture.
+4. Run `npm start` in `backend`. The API listens on port 3000 by default.
+5. In a separate terminal, run `npm ci` and `npm run dev` from `frontend/nrl-dashboard`.
+6. Open the URL printed by Next.js (normally `http://localhost:3001` if port 3000 is occupied by the API).
 
-## Getting Started
+The frontend requests `/api/*` from its own origin. Next.js forwards those requests to `API_URL`, which defaults to `http://localhost:3000`. Set `API_URL` in the frontend environment when deploying the API elsewhere. Keep the API reachable from the Next.js server. The API port can be changed with `PORT` in `backend/.env`.
 
-### Prerequisites
+## Data model
 
-- Node.js
-- npm or yarn
-- MySQL
+- `backend/db/schema.sql`: teams, locations and matches. `matches.attendance` is the measured crowd; `teams.capacity` is venue capacity. They are separate fields.
+- `backend/db/demo.sql`: repeatable, invented demo data for three teams. Stadium fields are null because no verified stadium source is bundled.
+- Match results award 1 for a win, 0.5 for a draw, and 0 for a loss. Ranking endpoints require six total games, and home/away rankings require three games in that role.
 
-### Backend Setup
+Import your own verified match data into these tables to use the dashboard with real history. The API currently provides read-only endpoints in `backend/routes`. Update `teams` with sourced stadium values where available; unknown values are displayed as “Not recorded.”
 
-1. Navigate to the backend directory:
+## Checks
 
-```sh
-cd NRL-analytics-platform/backend
-```
-
-2. Install the dependencies:
-
-```sh
-npm install
-```
-
-3. Create a .env file in the backend directory with the following content:
-
-```sh
-DB_HOST=<DB_HOST>
-DB_USER=<DB_USER>
-DB_PASSWORD=<DB_PASSWORD>
-DB_NAME=<DB_NAME>
-```
-
-4. Start the backend server:
-
-```sh
-node app.js
-```
-
-### Frontend Setup
-
-1. Navigate to the frontend directory:
-
-```sh
-cd NRL-analytics-platform/frontend/nrl-dashboard
-```
-
-2. Install the dependencies:
-
-```sh
-npm install
-```
-
-3. Start the development server:
-
-```sh
-npm run dev
-```
-
-4. Open http://localhost:3001 with your browser to see the result.
-
-
-## Scripts
-
-### Backend
-
--   node app.js: Starts the backend server.
-
-### Frontend
-
--   npm run dev: Starts the development server.
--   npm run build: Builds the application for production.
--   npm run start: Starts the production server.
--   npm run lint: Runs the linter.
-
-## Usage
-
-After setting up the backend and frontend, you can use the application to view NRL team performance trends. The dashboard provides insights into the best and worst performing teams based on various metrics.
-
-## Learn More
-
-To learn more about the technologies used in this project, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Express.js Documentation](https://expressjs.com/)
-- [React Documentation](https://react.dev/)
-- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+Run `npm test` in `backend` after `npm run db:setup`; it exercises the API against the demo fixture. Run `npm run build` in `frontend/nrl-dashboard`. GitHub Actions runs both checks with MySQL on pushes and pull requests.
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-This README provides an overview of the project, setup instructions, and links to relevant documentation.
+MIT; see [LICENSE](LICENSE).

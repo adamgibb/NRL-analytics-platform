@@ -19,6 +19,9 @@ app.use('/', matchesRoutes);
 app.use('/', statsRoutes);
 
 // Start the server
-app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000');
-});
+if (require.main === module) {
+  const port = Number(process.env.PORT || 3000);
+  app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
+}
+
+module.exports = app;

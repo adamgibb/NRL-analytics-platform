@@ -9,5 +9,6 @@ router.get('/get_team_trends', matchController.getTeamTrends);
 router.get('/get_best_win_overall', matchController.getBestWinOverall);
 router.get('/get_worst_win_overall', matchController.getWorstWinOverall);
 router.get('/get_crowd_wins', matchController.getCrowdWins);
+router.get('/get_team_stadiums', matchController.getTeamStadiums);
 
 module.exports = router;
