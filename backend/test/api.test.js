@@ -18,8 +18,9 @@ test.after(async () => {
 
 async function get(path) {
   const response = await fetch(`${baseUrl}${path}`);
-  assert.equal(response.status, 200, `${path}: ${await response.text()}`);
-  return response.json();
+  const body = await response.text();
+  assert.equal(response.status, 200, `${path}: ${body}`);
+  return JSON.parse(body);
 }
 
 test('overall ranking counts each home and away appearance once', async () => {

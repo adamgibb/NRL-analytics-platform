@@ -56,7 +56,8 @@ WHERE total_wins_in_season = (SELECT MAX(total_wins_in_season) FROM seasons WHER
 ORDER BY team, year`);
 
 exports.getBiggestScore = (req, res) => sendQuery(res, `WITH ${teamGames}, scored AS (
-  SELECT team, opponent, year, round, points_for - points_against AS best_score_difference,
+  SELECT team, opponent, year, round,
+    CAST(points_for AS SIGNED) - CAST(points_against AS SIGNED) AS best_score_difference,
     points_for AS best_score_for_team, points_against AS best_opponent_score,
     CASE WHEN points_for > points_against THEN 'win' ELSE 'loss' END AS result_type
   FROM team_games WHERE points_for <> points_against
